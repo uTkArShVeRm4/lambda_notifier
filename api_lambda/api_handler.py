@@ -30,9 +30,11 @@ def handler(event, context):
     params = {
         "name": name,
         "url": url,
-        "email": email,
-        "phone_number": phone_number,
     }
+    if email:
+        params["email"] = email
+    if phone_number:
+        params["phone_number"] = phone_number
 
     # Add the entry to DynamoDB
     table.put_item(Item=params)

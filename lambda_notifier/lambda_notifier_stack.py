@@ -36,10 +36,12 @@ class LambdaNotifierStack(Stack):
             partition_key=aws_dynamodb.Attribute(
                 name="email", type=aws_dynamodb.AttributeType.STRING
             ),
-            sort_key=aws_dynamodb.Attribute(
+        )
+        ddb.add_global_secondary_index(
+            index_name="PhoneIndex",
+            partition_key=aws_dynamodb.Attribute(
                 name="phone_number", type=aws_dynamodb.AttributeType.STRING
             ),
-            projection_type=aws_dynamodb.ProjectionType.ALL,
         )
 
         # Create SNS topic
@@ -90,6 +92,10 @@ class LambdaNotifierStack(Stack):
             self, "Ticker", schedule=aws_events.Schedule.rate(Duration.minutes(5))
         )
 
+        # Create SQS event queue
+        queue = aws_sqs.Queue(
+            self, "ScrapeQueue", visibility_timeout=Duration.seconds(300)
+        )
         # Create Ticker lambda
         init_lambda = aws_lambda.Function(
             self,
@@ -97,16 +103,18 @@ class LambdaNotifierStack(Stack):
             handler="ticker_handler.handler",
             code=aws_lambda.Code.from_asset("ticker_lambda"),
             runtime=aws_lambda.Runtime.PYTHON_3_12,
+            environment={
+                "TABLE_NAME": ddb.table_name,
+                "TOPIC_ARN": topic.topic_arn,
+                "QUEUE_URL": queue.queue_url,
+            },
         )
 
+        ddb.grant_read_write_data(init_lambda)
         # Add tickers target to be init_lambda
         ticker.add_target(aws_events_targets.LambdaFunction(init_lambda))
 
-        # Create SQS event queue
-        queue = aws_sqs.Queue(
-            self, "ScrapeQueue", visibility_timeout=Duration.seconds(300)
-        )
-
+        queue.grant_send_messages(init_lambda)
         # Create scraper lambda
         scraper_lambda = aws_lambda.Function(
             self,

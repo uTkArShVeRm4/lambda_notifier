@@ -10,8 +10,7 @@ sqs = boto3.client("sqs")
 
 def handler(event, context):
     # Retrieve the queue URL using the queue name
-    queue_url_response = sqs.get_queue_url(QueueName="ScrapeQueue")
-    QUEUE_URL = queue_url_response["QueueUrl"]
+    QUEUE_URL = os.environ["QUEUE_URL"]
 
     # Scan the DynamoDB table to get all items
     res = table.scan()
